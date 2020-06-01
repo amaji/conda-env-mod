@@ -29,3 +29,4 @@ Several use-cases of `rcac-conda-env` is given in this webpage: [Python package 
 ### Maintainers
 This code is maintained by Amiya K Maji (amaji@purdue.edu) and Lev Gorenstein (lev@purdue.edu).
 
+&copy; Purdue University, 2019

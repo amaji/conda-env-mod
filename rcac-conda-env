@@ -1,10 +1,13 @@
 #!/bin/bash
 #
 # Amiya K Maji and Lev Gorenstein
-# Purdue University
+# Copyright: Purdue University, 2019.
 #
-# This script assumes that the anaconda
-# module does not set $PYTHONPATH.
+# This script assumes that you have Lmod and Anaconda installed on your system.
+# You should not set $PYTHONPATH to base Anaconda installation.
+# CONDA_ENVS_PATH must point to a writable directory.
+#
+# Run "rcac-conda-env --help" for instructions.
 #
 
 # Configurable settings
