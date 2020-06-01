@@ -5,8 +5,8 @@
  3. Now use `conda` or `pip` to install your Python package. Once the installation finishes, you can directly `import` it in your script. _No need to run `conda init` or `conda activate`_.
 
 **Prerequisites**
- - You must have [Lmod module software](https://lmod.readthedocs.io/en/latest/index.html) installed and configured on your system.
- - [Anaconda](https://www.anaconda.com/) must be installed as a module. The script assumes that `$CONDA_PREFIX` is defined in your Anaconda module and points to a writable directory, otherwise `conda create -n my_env` command may fail. 
+ - You must have [Lmod module software](https://lmod.readthedocs.io/en/latest/index.html) installed and configured on your system. Currently, `rcac-conda-env` generates module files in Lua format only. If you need to use TCL modules or would like to contribute a patch, please contact the maintainers.
+ - [Anaconda](https://www.anaconda.com/) must be installed as a module. The script assumes that `$CONDA_ENVS_PATH` is defined in your Anaconda module and points to a writable directory, otherwise `conda create -n my_env` command may fail. 
 
 ## Usage
 
