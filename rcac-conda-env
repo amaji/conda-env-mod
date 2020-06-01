@@ -1,0 +1,546 @@
+#!/bin/bash
+#
+# Amiya K Maji and Lev Gorenstein
+# Purdue University
+#
+# This script assumes that the anaconda
+# module does not set $PYTHONPATH.
+#
+
+# Configurable settings
+MODULE_TOP_DEF="$HOME/privatemodules" 	# Private modules reside here
+					# (c.f. 'module load use.own')
+MODULE_APP="conda-env" 			# Our generated modules go here
+					# (a subdir in MODULE_TOP)
+scriptname=${BASH_SOURCE##*/}
+
+# Need this to initialize Lmod and 'module' command in this non-login shell!
+source /etc/profile.d/modules.sh
+
+# Tell 'less' to pass ANSI escape sequences (so we could use bold in help text)
+export LESS="-R"
+
+# ----------------------------------------------------------------------
+
+function bold()
+{
+	tput bold; echo -n "$@"; tput sgr0;
+}
+
+function usage()
+{
+	cat <<-EOF
+
+    This tool makes a minimal Anaconda environment and generates a module file
+    for using it.
+
+    $(bold Usage:) ${scriptname} <subcommand> <required argument> [optional argument(s)]
+           ${scriptname} help
+
+    $(bold Subcommands:) create, delete, module, kernel
+
+    $(bold Required arguments:) 
+        Specify only one of the following.
+           -n|--name ENV_NAME          : name of the environment.
+           -p|--prefix ENV_PATH        : location of the environment.
+
+    $(bold Optional arguments:)
+           -m|--moduledir MODULE_DIR   : location of module file.
+           -j|--jupyter                : generate a Jupyter kernel for this 
+                                         environment (implies '--local-py').
+           --local-py|--local-python
+           --add-path |--add-to-path   : use the Python from the environment. 
+                                         Default is to use the Python from base
+                                         Anaconda module.
+           -y|--yes                    : assume "yes" to all internal questions.
+
+    $(bold Examples:)
+        1) Create an environment in the home directory:
+
+               ${scriptname} create -n my_test
+
+        2) Create an environment at a custom location, such as a group-shared
+           directory:
+
+               ${scriptname} create -p /my/depot/dir/my_test
+
+        3) Create an environment that can be used inside Jupyter Hub:
+
+               ${scriptname} create -n my_test -j
+
+        4) To use the environment, please read the instructions on the console
+           after running any of the commands above:
+
+               module use ${MODULE_TOP_DEF}
+               module load ${MODULE_APP}/my_test-py3.6.4
+               pip install ....
+               conda install ....
+
+           * Note: Do $(bold "NOT") use 'pip install --user' as it does not install 
+             packages in the environment.
+
+    (( Enter 'q' to exit from the help menu ))
+
+	EOF
+}
+
+function create_env()
+{
+	#
+	# Usage: create_env
+	#
+	if [[ ${#CONDA_ARGS[@]} -eq 0 ]]; then
+		echo "Usage: create_env needs either a name or a prefix"
+		exit 1
+	fi
+
+	#ENV_NAME="$1"
+	if [ "${ENV_PREFIX}" != "" ]; then
+		ENV_DIR="${ENV_PREFIX}"
+	else
+		env_list=$(conda env list)
+		ENV_DIR=$(echo "${env_list}" | grep "${ENV_NAME} .*/${ENV_NAME}" | awk '{print $NF}')
+	fi
+
+	if [[ "${ENV_DIR}" != "" ]] && [[ -d "${ENV_DIR}" ]] ; then
+		echo "Directory already exists: ${ENV_DIR}"
+		echo "Please specify a different environment name or path."
+		exit 1
+	fi
+
+	#
+	# Now the actual conda create
+	#
+	echo conda create -q --copy "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
+	conda create -q --copy "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
+	status=$?
+
+	env_list=$(conda env list)
+
+	if [ $(echo "${env_list}" | grep -c "${ENV_NAME} .*/${ENV_NAME}") -gt 1 ]; then
+		echo "Name matched more than one environment prefix or suffix."
+		echo "You may need to fix the module file manually at: ${MODULE_DIR}"
+	fi
+
+	if [ ${status} -ne 0 ]; then
+		echo "Failed to create environment: ${ENV_NAME}"
+		exit 1
+	else
+		create_module "${ENV_NAME}"
+		if [[ $Opt_JUPYTER -ne 0 ]]; then
+			create_kernel "${ENV_NAME}"
+		fi
+		echo "Your environment \"${ENV_NAME}\" was created successfully."
+	fi
+
+}
+# end create_env
+
+function delete_env()
+{
+	#
+	# Usage: delete_env
+	#
+	if [[ ${#CONDA_ARGS[@]} -eq 0 ]]; then
+		echo "Usage: delete_env needs either a name or a prefix."
+		exit 1
+	fi
+	#ENV_NAME="$1"
+	if [ "${ENV_PREFIX}" != "" ]; then
+		ENV_DIR="${ENV_PREFIX}"
+	else
+		env_list=$(conda env list)
+		ENV_DIR=$(echo "${env_list}" | grep "${ENV_NAME} .*/${ENV_NAME}" | awk '{print $NF}')
+	fi
+	if [[ "${ENV_DIR}" == "" ]]; then
+		echo -e "I could not find an environment: ${ENV_NAME}.\nAborting delete command."
+		exit 1
+	elif [[ ! -d "${ENV_DIR}/conda-meta" ]]; then
+		echo -e "I could not find an environment at: ${ENV_DIR}.\nAborting delete command."
+		exit 1
+	fi
+
+	# A chance to back things up.
+	echo
+	echo "It is recommended to save a list of installed packages using"
+	echo "    'conda list -n ${ENV_NAME}'"
+	echo
+	while [[ $Opt_YES -eq 0 ]]; do
+		read -er -p "Are you sure you want to continue? (y/n): " answer
+		case "${answer,,}" in
+			n|no) 		exit 2 ;;
+			y|yes) 		break ;;
+			*) 		echo "Invalid choice: $answer" ;;
+		esac
+	done
+
+	# Now the actual deletion
+	#
+	echo conda-env remove "${CONDA_ARGS[@]}"
+	conda-env remove "${CONDA_ARGS[@]}"
+	status=$?
+
+	if [ $status -ne 0 ]; then
+		echo "Failed to remove environment: ${ENV_NAME}"
+		exit 1
+	elif [[ -d "${ENV_DIR}/conda-meta" ]]; then
+		# User has answered 'no' to conda-env's prompt, bail out
+		# TODO:	This assumption is not always correct. E.g. for 
+		# 	a group-shared environment (-p /depot/....) where
+		# 	I don't have permissions to delete the env itself,
+		# 	I may still want to delete my modules for that
+		# 	environment.  The above simplistic check fails in
+		# 	such scenario.
+		# 	Need better check (or just remove module and kernel
+		# 	anyways?)  The user can always recreate them ;-)
+		exit
+	else
+		echo "Successfully removed environment: ${ENV_NAME}"
+	fi
+
+	# Delete the modulefile
+	MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	echo "Deleting module file: ${MODULE_FILE//$HOME/\$HOME}"
+	rm -f "${MODULE_FILE}"
+
+	# Also delete Jupyter kernel.
+	if [[ "${KERNEL_DIR}" != "" && -d "${KERNEL_DIR}" ]]; then
+		echo "Deleting Jupyter kernel: ${KERNEL_DIR//$HOME/\$HOME}"
+		rm -rf "${KERNEL_DIR}"
+	fi
+
+}
+# end delete_env
+
+
+function create_module()
+{
+	#
+	# Usage: create_module
+	#
+	if [[ ${#CONDA_ARGS[@]} -eq 0 ]]; then
+		echo "Usage: create_module needs either a name or a prefix."
+		exit 1
+	fi
+	#ENV_NAME="$1"
+	if [ "${ENV_PREFIX}" != "" ]; then
+		ENV_DIR="${ENV_PREFIX}"
+	else
+		env_list=$(conda env list)
+		ENV_DIR=$(echo "${env_list}" | grep "${ENV_NAME} .*/${ENV_NAME}" | awk '{print $NF}')
+	fi
+	if [[ "${ENV_DIR}" == "" ]] || [[ ! -d "${ENV_DIR}" ]]; then
+		echo -e "I could not find a location for the environment: ${ENV_NAME} \nAborting module file creation."
+		exit 1
+	fi
+
+	if [ ! -d "${MODULE_DIR}" ]; then
+		mkdir -p "${MODULE_DIR}"
+	fi
+
+	MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	CONDA_MODULE="$(module --redirect --terse list anaconda | grep '^anaconda/.*')"
+
+	cat <<-EOF > "${MODULE_FILE}"
+		-- created on $(date) by $USER
+
+		depends_on("${CONDA_MODULE}")
+
+		local modroot = "${ENV_DIR}"
+		local pyver   = "${PY}"
+
+		local bashStr = 'eval '..modroot..'/bin/pip "\$@"'
+		local cshStr  = "eval "..modroot.."/bin/pip \$*"
+		set_shell_function("pip",bashStr,cshStr)
+		-- If this is Python3 environment, brace against 'pip3', too
+		if (string.match(pyver,"^3%.")) then
+		 	set_shell_function("pip3",bashStr,cshStr)
+		end
+
+		pushenv("CONDA_PREFIX",modroot)
+		pushenv("CONDA_DEFAULT_ENV",modroot)
+		prepend_path("LD_LIBRARY_PATH",modroot.."/lib")
+		prepend_path("PYTHONPATH",modroot.."/lib/python${PY_S}/site-packages")
+		-- This is needed for 'python -m pip' to behave, too.
+		-- Upd: Interferes with conda 'install', need more testing
+		-- pushenv("PIP_TARGET",modroot.."/lib/python${PY_S}/site-packages")
+	EOF
+	echo >> "${MODULE_FILE}"
+
+	if [[ $Opt_LOCAL_PY -eq 0 ]]; then
+		cat <<-EOF >> "${MODULE_FILE}"
+			-- This line is deliberately commented out.
+			-- We want to use Python from base Anaconda.
+			-- prepend_path("PATH",modroot.."/bin")
+		EOF
+	else
+		cat <<-EOF >> "${MODULE_FILE}"
+			-- Normally we'd want to use Python from base Anaconda, but in this
+			-- special case we'll use Python from the environment itself.
+			prepend_path("PATH",modroot.."/bin")
+		EOF
+	fi
+
+	# And concoct instructions for the user.
+	# 'module use' is preferred, but fall back to 'use.own' if available
+	USELINE="module use ${CUSTOM_MODTOP//$HOME/\$HOME}"
+	HAVE_USEOWN=$(module --redirect -q avail use.own | grep -c use.own)
+	if [[ "${MODULE_DIR}" =~ "${MODULE_TOP_DEF}/".* && "$HAVE_USEOWN" -gt 0 ]]; then
+		USELINE="module load use.own"
+	fi
+	MSG=( "To use this environment, load the following modules:"
+	      "    $USELINE"
+	      "    module load ${MODULE_APP}/${ENV_NAME}-py${PY}"
+	      "(then standard 'pip install' / 'conda install' / run scripts)"
+	)
+	boxify_text "${MSG[@]}"
+
+}
+# end create_module
+
+
+function create_kernel()
+{
+	#
+	# Usage: create_kernel
+	#
+	if [[ ${#CONDA_ARGS[@]} -eq 0 ]]; then
+		echo "Usage: create_kernel needs either a name or a prefix."
+		exit 1
+	fi
+	#ENV_NAME="$1"
+	if [ "${ENV_PREFIX}" != "" ]; then
+		ENV_DIR="${ENV_PREFIX}"
+	else
+		env_list=$(conda env list)
+		ENV_DIR=$(echo "${env_list}" | grep "${ENV_NAME} .*/${ENV_NAME}" | awk '{print $NF}')
+	fi
+	if [[ "${ENV_DIR}" == "" || ! -d "${ENV_DIR}" ]]; then
+		echo -e "I could not find a location for the environment: ${ENV_NAME} \nAborting Jupyter kernel creation."
+		exit 1
+	fi
+
+	if [[ "${KERNEL_DIR}" == "" ]]; then
+		echo -e "I could not find suitable location for Jupyter kernels \nAborting Jupyter kernel creation."
+		exit 1
+	fi
+
+	if [ ! -d "${KERNEL_DIR}" ]; then
+		mkdir -p "${KERNEL_DIR}" || exit 1
+	fi
+
+	DISPLAY_NAME="Python (My ${ENV_NAME} Kernel)"
+	cat <<-EOF > "${KERNEL_FILE}"
+		{
+		 "display_name": "${DISPLAY_NAME}", 
+		 "language": "python", 
+		 "argv": [
+		  "${ENV_DIR}/bin/python", 
+		  "-m", 
+		  "ipykernel_launcher", 
+		  "-f", 
+		  "{connection_file}"
+		 ]
+		}
+	EOF
+
+	# TODO: add icons!
+	# 	logo-32x32.png
+	# 	logo-64x64.png
+
+	echo
+	echo "Jupyter kernel created: \"${DISPLAY_NAME}\""
+	MSG=( "We recommend installing packages into your kernel environment"
+	      "via the command line (with 'pip install' or 'conda install')."
+
+	)
+	boxify_text "${MSG[@]}"
+
+}
+# end create_kernel
+
+
+function boxify_text()
+{
+	#
+	# Usage: boxify_text AAAA [BBB ...]
+	#
+	# Output:
+	#	+------+
+	#	| AAAA |
+	#	| BBB  |
+	#	+------+
+	#
+	local msg=("$@")
+	local line longest width
+	for line in "${msg[@]}"; do
+		if [[ ${#line} -gt $width ]]; then
+			longest="$line"
+			width="${#line}"
+		fi
+	done
+	echo "+-${longest//?/-}-+"
+	for line in "${msg[@]}"; do
+		printf '| %s%*s%s |\n' "$(tput bold)" "-$width" "$line" "$(tput sgr0)"
+	done
+	echo "+-${longest//?/-}-+"
+}
+# end boxify_text
+
+
+# ----------------------------------------------------------------------
+
+
+#
+# Script starts here
+#
+if [ "$1" == "help" ]; then
+	usage | less
+	exit
+fi
+
+if ! module --redirect list | grep anaconda > /dev/null; then
+	echo "This script needs an anaconda module to be loaded. Please load it using:"
+	echo "    'module load anaconda'"
+	exit 1
+fi
+
+PY=$(python -V 2>&1 | grep -o "^Python .*" | grep -o "[0-9]\(\.[0-9]\+\)\+")
+PY_S=$(python -V 2>&1 | grep -o "^Python .*" | grep -o "[0-9]\.[0-9]\+")
+
+if [ "$PY" == "" ]; then
+	echo "Python version cannot be empty. Please verify."
+	exit 1
+fi
+
+# Set initial values for flags
+MODULE_TOP="${MODULE_TOP_DEF}"
+CONDA_ARGS=()
+CONDA_XTRA=() 		# CONDA_ARGS are used for -p/-n/-y, XTRA is for packages
+Opt_YES=0
+Opt_LOCAL_PY=0
+Opt_JUPYTER=0
+
+# Where jupyter kernels might be.  Ask Jupyter if we can, or use defaults.
+if command -v jupyter > /dev/null; then
+	JUPYTER_DATADIR=$(jupyter --data-dir)
+elif [[ -n $XDG_DATA_HOME ]]; then
+	JUPYTER_DATADIR="$XDG_DATA_HOME/jupyter"
+else
+	JUPYTER_DATADIR="$HOME/.local/share/jupyter"
+fi
+
+# Parse command line
+SUBCOMMAND="$1"
+shift
+TEMP=$(getopt -o hp:m:n:yj --long help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path -- "$@")
+eval set -- "$TEMP"
+while true; do
+	case "$1" in
+		-n|--name)
+			ENV_NAME="$2"; shift 2 ;;
+		-p|--prefix)
+			ENV_PREFIX="$2" ; shift 2 ;;
+		-m|--moduledir)
+			CUSTOM_MODTOP="$2"
+			MODULE_TOP="$2" ; shift 2 ;;
+		-y|--yes)
+			Opt_YES=1; shift ;;
+		-j|--jupyter)
+			Opt_JUPYTER=1; shift ;;
+		--local-py|--local-python|--add-path|--add-to-path)
+			Opt_LOCAL_PY=1; shift ;;
+		--) shift ; break ;;
+		*)  echo "Incorrect option." ;
+			usage | less ; 
+                        exit 1 ;;
+	esac
+done
+
+# Logic for environment name and location
+if [ "${ENV_PREFIX}" != "" ]; then
+	CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
+	if [ "${ENV_NAME}" == "" ]; then
+		ENV_NAME=${ENV_PREFIX##*/}
+	fi
+fi
+if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
+	CONDA_ARGS+=( --name "${ENV_NAME}" )
+fi
+
+# Assemble actual modulefile directory name
+MODULE_DIR="${MODULE_TOP}/${MODULE_APP}"
+
+# Ditto for Jupyter kernel
+KERNEL_TOP="${JUPYTER_DATADIR}/kernels"
+KERNEL_NAME="${ENV_NAME//[^-_.[:alnum:]]/_}" 	# Jupyter rules: allow alnum, -._
+KERNEL_NAME="${KERNEL_NAME,,}" 			# Lower-case it (ipython does)
+KERNEL_DIR="${KERNEL_TOP}/${KERNEL_NAME}"
+KERNEL_FILE="${KERNEL_DIR}/kernel.json"
+
+
+# If we make Jupyter kernel, this requires using local [i]python.
+if [[ $Opt_JUPYTER -ne 0 ]]; then
+	Opt_LOCAL_PY=1
+	CONDA_XTRA+=( ipython ipykernel )
+fi
+
+# Say yes to the process?
+if [[ $Opt_YES -ne 0 ]]; then
+	CONDA_ARGS+=( --yes )
+fi
+
+# And... action!
+case "$SUBCOMMAND" in
+	create)
+		echo "requested $SUBCOMMAND with arguments: $TEMP"
+		if [[ "${ENV_NAME}" == "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
+			echo "Please specify either an environment name OR a prefix."
+			echo "Enter: '${scriptname} help' for usage instructions."
+			exit
+		fi
+		create_env
+		;;
+	delete)
+		echo "requested $SUBCOMMAND with arguments: $TEMP"
+		if [[ "${ENV_NAME}" == "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
+			echo "Please specify either an environment name OR a prefix."
+			echo "Enter: '${scriptname} help' for usage instructions."
+			exit
+		fi
+		delete_env
+		;;
+	module)
+		echo "requested $SUBCOMMAND with arguments: $TEMP"
+		if [[ "${ENV_NAME}" == "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
+			echo "Please specify either an environment name OR a prefix."
+			echo "Enter: '${scriptname} help' for usage instructions."
+			exit
+		fi
+		create_module
+		if [[ $Opt_JUPYTER -ne 0 ]]; then
+			create_kernel
+		fi
+		;;
+	kernel)
+		echo "requested $SUBCOMMAND with arguments: $TEMP"
+		if [[ "${ENV_NAME}" == "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
+			echo "Please specify either an environment name OR a prefix."
+			echo "Enter: '${scriptname} help' for usage instructions."
+			exit
+		fi
+		create_kernel
+		;;
+	-h|--help|help)
+		usage | less
+		;;
+	"")
+		echo "You must specify a subcommand."
+		echo "Enter: '${scriptname} help' for usage instructions."
+		;;
+	*)
+		echo "Invalid subcommand: $@"
+		echo "Enter: '${scriptname} help' for usage instructions."
+		;;
+esac
+
