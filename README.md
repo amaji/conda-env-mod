@@ -11,15 +11,18 @@
 ## Usage
 
 User guide for `rcac-conda-env` is provided as a manual page with this repository. You will need to add the `share` directory to your `$MANPATH`.
-    ```
+
+  ```
+    $ export PATH=/path/to/rcac-conda-env:$PATH
     $ export MANPATH=/path/to/rcac-conda-env/share/man:$MANPATH
     $ man rcac-conda-env
-    ```
+  ```
 
-A shortened version of usage instructions can be obtained by using the `--help` option.
-    ```
+A shortened version of usage instructions can be obtained with `--help` option.
+
+  ```
     $ rcac-conda-env --help
-    ```
+  ```
 
 Several use-cases of `rcac-conda-env` is given in this webpage: [Python package installation](https://www.rcac.purdue.edu/knowledge/brown/run/examples/apps/python/packages)
 
