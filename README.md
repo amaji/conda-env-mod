@@ -10,7 +10,7 @@
 
 ## Usage
 
-User guide for `rcac-conda-env is provided as a manual page with this repository. You will need to add the `share` directory to your `$MANPATH`.
+User guide for `rcac-conda-env` is provided as a manual page with this repository. You will need to add the `share` directory to your `$MANPATH`.
     ```
     $ export MANPATH=/path/to/rcac-conda-env/share/man:$MANPATH
     $ man rcac-conda-env
