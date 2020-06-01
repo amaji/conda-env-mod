@@ -26,6 +26,13 @@ A shortened version of usage instructions can be obtained with `--help` option.
 
 Several use-cases of `rcac-conda-env` is given in this webpage: [Python package installation](https://www.rcac.purdue.edu/knowledge/brown/run/examples/apps/python/packages)
 
+### Citation
+Kindly cite usage of this tool by pointing to this repository.
+```
+Amiya K Maji and Lev Gorenstein. RCAC-CONDA-ENV: A tool for simplifying Python package installation 
+on HPC clusters, 2019. https://github.com/amaji/rcac-conda-env
+```
+
 ### Maintainers
 This code is maintained by Amiya K Maji (amaji@purdue.edu) and Lev Gorenstein (lev@purdue.edu).
 
