@@ -436,10 +436,12 @@ fi
 # Parse command line
 SUBCOMMAND="$1"
 shift
-TEMP=$(getopt -o hp:m:n:yj --long help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path -- "$@")
+TEMP=$(getopt -o a:hp:m:n:yj --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path -- "$@")
 eval set -- "$TEMP"
 while true; do
 	case "$1" in
+		-a|--appname)
+			MODULE_APP="$2"; shift 2 ;;
 		-n|--name)
 			ENV_NAME="$2"; shift 2 ;;
 		-p|--prefix)
