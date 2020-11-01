@@ -7,7 +7,7 @@
 # You should not set $PYTHONPATH to base Anaconda installation.
 # CONDA_ENVS_PATH must point to a writable directory.
 #
-# Run "rcac-conda-env --help" for instructions.
+# Run "conda-env-mod --help" for instructions.
 #
 
 # Configurable settings
