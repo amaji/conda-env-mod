@@ -11,14 +11,26 @@
 #
 
 # Configurable settings
+#########################################
 MODULE_TOP_DEF="$HOME/privatemodules" 	# Private modules reside here
 					# (c.f. 'module load use.own')
 MODULE_APP="conda-env" 			# Our generated modules go here
 					# (a subdir in MODULE_TOP)
+ENVIRONMENT_MODULE_TYPE="lmod"          # At present only Lmod is supported
+					# May be extended to "tcl" later.
+MODULE_INIT_SCRIPT="/etc/profile.d/modules.sh"
+					# Script to initialize Lmod commands.
+BASE_CONDA_MODULE_NAME="anaconda"	# This is what you call the base
+					# anaconda module.
+# end configurations                    #
+#########################################
+
 scriptname=${BASH_SOURCE##*/}
 
 # Need this to initialize Lmod and 'module' command in this non-login shell!
-source /etc/profile.d/modules.sh
+if [ -f "${MODULE_INIT_SCRIPT}" ]; then
+	source "${MODULE_INIT_SCRIPT}"
+fi
 
 # Tell 'less' to pass ANSI escape sequences (so we could use bold in help text)
 export LESS="-R"
@@ -242,13 +254,26 @@ function create_module()
 	fi
 
 	MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
-	CONDA_MODULE="$(module --redirect --terse list anaconda | grep '^anaconda/.*')"
+	CONDA_MODULE="$(module --redirect --terse list ${BASE_CONDA_MODULE_NAME} | grep \"^${BASE_CONDA_MODULE_NAME}\/.*\")"
 
 	cat <<-EOF > "${MODULE_FILE}"
 		-- created on $(date) by $USER
 
-		depends_on("${CONDA_MODULE}")
+	EOF
+	if [ "${CONDA_MODULE}" != "" ]; then
+		cat <<-EOF >> "${MODULE_FILE}"
+			depends_on("${CONDA_MODULE}")
 
+		EOF
+	elif [ -f "${CONDA_PREFIX}/bin/conda" ]; then
+		cat <<-EOF >> "${MODULE_FILE}"
+			-- Use the base conda that created this environment.
+			prepend_path("PATH","${CONDA_PREFIX}/bin")
+		EOF
+	else
+		echo -e "WARNING: Couldn't find an anaconda module.\nPlease make sure you to initialize conda separately."
+	fi
+	cat <<-EOF >> "${MODULE_FILE}"
 		local modroot = "${ENV_DIR}"
 		local pyver   = "${PY}"
 
@@ -390,6 +415,93 @@ function boxify_text()
 }
 # end boxify_text
 
+# This function checks if Lmod is available and initialized.
+#
+function check_lmod_present()
+{
+	# First check Lmod is available and initialized
+	#
+	if ! command -v module &>/dev/null; then
+		echo "Module command is not available. ${scriptname} depends on the Lmod environment module software."
+		exit 1
+	fi
+	if command -V module | grep -q LMOD_CMD; then
+		if [ "${LMOD_CMD}" == "" ]; then
+			echo "Cannot find LMOD_CMD in your shell."
+			echo "Is Lmod initialized correctly."
+			exit 1
+		elif [ ! -f "${LMOD_CMD}" ]; then
+			echo "Cannot locate ${LMOD_CMD}."
+			exit 1
+		fi
+	else
+		echo "${scriptname} depends on the Lmod environment module software. Please make sure you have Lmod initialized."
+		exit 1
+	fi
+}
+# end check_lmod_present
+
+# This function checks if the conda command is available in the user's shell.
+#
+function check_conda_present()
+{
+	if ! command -v conda &>/dev/null; then
+		echo "${scriptname} needs 'conda'. Looks like the 'conda' command is not available."
+		exit 1
+	elif ! conda -V &>/dev/null; then
+		echo "Cannot execte 'conda' command. Aborting."
+		exit 1
+	fi
+
+	if [ "${BASE_CONDA_MODULE_NAME}" != "" ]; then
+		HAVE_CONDA_MODULE=$(module --redirect --terse spider ${BASE_CONDA_MODULE_NAME} | grep -o ${BASE_CONDA_MODULE_NAME})
+		if [ "${HAVE_CONDA_MODULE}" == "" ]; then
+			echo "WARNING: Cannot find ${BASE_CONDA_MODULE_NAME} module. ${scriptname} may not work properly."
+		fi
+	else
+		echo "WARNING: ${BASE_CONDA_MODULE_NAME} module is not defined. ${scriptname} may not work properly."
+	fi
+}
+# end check_conda_present
+
+# This function looks for key CONDA_* environment variables and sets them if needed.
+#
+function check_conda_variables()
+{
+	if [ "${CONDA_ENVS_PATH}" == "" ]; then
+		osver=$(awk -v FS='=' '($1 == "ID"){os = $2};($1 == "VERSION_ID"){rel=$2}END{print os rel}' /etc/os-release | tr -d \")
+		if [ "${osver}" == "" ]; then
+			osver="unknown"
+		fi
+		conda_ver=$(conda -V |& grep -o '[0-9.]\+')
+		echo "Setting CONDA_ENVS_PATH=${HOME}/.conda/envs/${osver}/conda-${conda_ver}"
+		echo "New environments will be created in this directory unless --prefix is specified."
+		export CONDA_ENVS_PATH="${HOME}/.conda/envs/${osver}/conda-${conda_ver}"
+	fi
+
+	if [ "${CONDA_PREFIX}" == "" ]; then
+		# Set CONDA_PREFIX to base anaconda installation
+		bindir=$(dirname $(command -v conda))
+		base_conda_dir=$(realpath $bindir/..)
+		if [ "${base_conda_dir}" != "" ]; then
+			echo export CONDA_PREFIX="${base_conda_dir}"
+			export CONDA_PREFIX="${base_conda_dir}"
+		fi
+	fi
+}
+# end check_conda_variables
+
+# This function makes sure that the user environment is sane.
+#
+function check_user_env()
+{
+	if [ "${ENVIRONMENT_MODULE_TYPE^^}" == "LMOD" ]; then
+		check_lmod_present
+	fi
+
+	check_conda_present
+	check_conda_variables
+}
 
 # ----------------------------------------------------------------------
 
@@ -402,11 +514,9 @@ if [ "$1" == "help" ]; then
 	exit
 fi
 
-if ! module --redirect list | grep anaconda > /dev/null; then
-	echo "This script needs an anaconda module to be loaded. Please load it using:"
-	echo "    'module load anaconda'"
-	exit 1
-fi
+# Check user's env and set essential variables
+#
+check_user_env
 
 PY=$(python -V 2>&1 | grep -o "^Python .*" | grep -o "[0-9]\(\.[0-9]\+\)\+")
 PY_S=$(python -V 2>&1 | grep -o "^Python .*" | grep -o "[0-9]\.[0-9]\+")
