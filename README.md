@@ -30,11 +30,10 @@ Several use-cases of `conda-env-mod` is given in this webpage: [Python package i
 ### Citation
 Kindly cite usage of this tool by pointing to this repository.
 ```
-Amiya K Maji and Lev Gorenstein. RCAC-CONDA-ENV: A tool for simplifying Python package installation 
-on HPC clusters, 2019. https://github.com/amaji/conda-env-mod
+Amiya K. Maji, Lev Gorenstein, and Geoffrey Lentner. "Demystifying Python Package Installation with conda-env-mod." In Proceedings of the 7th Annual Workshop on HPC User Support Tools (HUST 2020), pp. 1-10. 2020.
 ```
 
 ### Maintainers
 This code is maintained by Amiya K Maji (amaji@purdue.edu) and Lev Gorenstein (lev@purdue.edu).
 
-&copy; Purdue University, 2019
+&copy; Purdue University, 2020
