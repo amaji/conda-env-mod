@@ -2,17 +2,17 @@
 .\" Contact rcac-help@purdue.edu to correct errors or typos.
 .TH man 7 "11 Oct 2019" "0.1.0" "conda-env-mod man page"
 .SH NAME
-conda-env-mod \- Create and configure a custom anaconda environment for installing Python packages. 
+conda-env-mod \- Create and configure a custom anaconda environment for installing Python packages.
 .SH SYNOPSIS
 conda-env-mod subcommand [options]...
 .SH DESCRIPTION
 conda-env-mod
 
-    This script makes very minimal Anaconda environments and generates 
-    Lmod module files for using them.  Users can later install and use 
+    This script makes very minimal Anaconda environments and generates
+    Lmod module files for using them.  Users can later install and use
     python packages in the environment after loading the modules.
 
-    Key points: 
+    Key points:
       - no need to 'source activate' or 'conda activate' (tcsh users, rejoice!)
       - all users do is a familiar 'module use' and 'module load/unload'
       - generated environments have access to all packages of base Anaconda
@@ -21,19 +21,19 @@ conda-env-mod
       - sane Jupyter kernels
 
 
-    Usage: ${scriptname} <subcommand> ...arguments...
-           ${scriptname} create <[-n env_name]|[-p env_path]> [-m module_dir]
-           ${scriptname} delete <[-n env_name]|[-p env_path]> [-m module_dir]
-           ${scriptname} module <[-n env_name]|[-p env_path]> [-m module_dir]
-           ${scriptname} kernel <[-n env_name]|[-p env_path]>
-           ${scriptname} help
+    Usage: conda-env-mod <subcommand> ...arguments...
+           conda-env-mod create <[-n env_name]|[-p env_path]> [-m module_dir]
+           conda-env-mod delete <[-n env_name]|[-p env_path]> [-m module_dir]
+           conda-env-mod module <[-n env_name]|[-p env_path]> [-m module_dir]
+           conda-env-mod kernel <[-n env_name]|[-p env_path]>
+           conda-env-mod help
 
     Examples:
-           ${scriptname} create -n my_test
-           ${scriptname} create -p /my/depot/dir/my_test
+           conda-env-mod create -n my_test
+           conda-env-mod create -p /my/depot/dir/my_test
            .....
-           module use ${MODULE_TOP_DEF}
-           module load ${MODULE_APP}/my_test-py2.7.14
+           module use $HOME/privatemodules
+           module load conda-env/my_test-py2.7.14
            pip install ....
            conda install ....
 
@@ -64,7 +64,7 @@ conda-env-mod
                      Default value is 'conda-env'
            -m|--moduledir module_dir
                      Location of module file.
-                     Default value is ${MODULE_TOP_DEF//$HOME/\$HOME}
+                     Default value is $HOME/privatemodules
 
            -y|--yes  Assume "yes" to all internal questions.
                      Default is to ask confirmations interactively.
@@ -79,15 +79,15 @@ conda-env-mod
            --add-path |--add-to-path
                      By default, generated modulefiles rely on Python
                      interpreter from base Anaconda (new environment's
-                     "bin" directory is not added to \$PATH).  While this
+                     "bin" directory is not added to $PATH).  While this
                      is intentional and desired, for some rare occasions you
                      might need to do the opposite and use Python and commands
                      from the new environment instead.  One notable use case
-                     is when creating a Jupyter kernel for new environment, 
-                     or occasionally when some of your desired packages 
+                     is when creating a Jupyter kernel for new environment,
+                     or occasionally when some of your desired packages
                      conflict with their counterparts in the base Anaconda.
-                     This switch will tweak the modulefile to prepend 
-                     environment's bindir to the \$PATH.  Note that if you go
+                     This switch will tweak the modulefile to prepend
+                     environment's bindir to the $PATH.  Note that if you go
                      this route, base Anaconda packages become unavailable,
                      so you would have to install _all_ off your necessary
                      packages into the environment.
@@ -96,17 +96,17 @@ conda-env-mod
        * In default mode, resulting environment uses *base* python and all
          base's existing packages, while 'pip install' and 'conda install'
          conveniently install new packages into the environment.
-       * In the '--local-python' mode, your resulting environment uses  
+       * In the '--local-python' mode, your resulting environment uses
          the *environment's* python, and does *not* see any of the base
          Anaconda packages.  So you need to 'pip install' and 'conda install'
          everything you need.
        * Do not use 'pip install --user' (you want your packages to go into
-         the environment, not into \$HOME/.local/lib/).
+         the environment, not into $HOME/.local/lib/).
 
     When generating Jupyter kernels ('kernel' mode or '--jupyter'),
-    everything above about '--local-python' applies.  Additionally, we 
+    everything above about '--local-python' applies.  Additionally, we
     highly recommend installing your packages from command line.
-    DO NOT USE plain '!pip install' or '!conda install' from inside 
+    DO NOT USE plain '!pip install' or '!conda install' from inside
     Jupyter notebook! See excellent explanation why here:
        http://jakevdp.github.io/blog/2017/12/05/installing-python-packages-from-jupyter/
     If you do need to install packages from inside a notebook, use either
@@ -125,4 +125,4 @@ conda-env-mod(7), conda-env
 .SH BUGS
 No known bugs.
 .SH AUTHOR
-Amiya K Maji and Lev Gorenstein
+Amiya K Maji and Lev Gorenstein, Purdue University
