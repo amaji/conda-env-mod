@@ -575,11 +575,22 @@ while true; do
 	esac
 done
 
+# If we are given a prefix, trim trailing slashes, and do a sanity check.
+# If necessary, bail out here to avoid confusing messages later.
+if [ "${ENV_PREFIX}" != "" ]; then
+	buf=$(echo "${ENV_PREFIX}" | sed -e 's:/*$::')
+	if [[ -z "$buf" ]]; then
+		echo "Not accepting '$ENV_PREFIX' for an environment prefix."
+		exit 1
+	fi
+	ENV_PREFIX="$buf"
+fi
+
 # Logic for environment name and location
 if [ "${ENV_PREFIX}" != "" ]; then
 	CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
 	if [ "${ENV_NAME}" == "" ]; then
-		ENV_NAME=${ENV_PREFIX##*/}
+		ENV_NAME="${ENV_PREFIX##*/}"
 	fi
 fi
 if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
