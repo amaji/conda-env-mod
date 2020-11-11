@@ -257,7 +257,7 @@ function create_module()
 	fi
 
 	MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
-	CONDA_MODULE="$(module --redirect --terse list ${BASE_CONDA_MODULE_NAME} | grep \"^${BASE_CONDA_MODULE_NAME}\/.*\")"
+	CONDA_MODULE=$(module --redirect --terse list ${BASE_CONDA_MODULE_NAME} | grep "^${BASE_CONDA_MODULE_NAME}\/.*")
 
 	cat <<-EOF > "${MODULE_FILE}"
 		-- created on $(date) by $USER
@@ -292,9 +292,6 @@ function create_module()
 		pushenv("CONDA_DEFAULT_ENV",modroot)
 		prepend_path("LD_LIBRARY_PATH",modroot.."/lib")
 		prepend_path("PYTHONPATH",modroot.."/lib/python${PY_S}/site-packages")
-		-- This is needed for 'python -m pip' to behave, too.
-		-- Upd: Interferes with conda 'install', need more testing
-		-- pushenv("PIP_TARGET",modroot.."/lib/python${PY_S}/site-packages")
 	EOF
 	echo >> "${MODULE_FILE}"
 
