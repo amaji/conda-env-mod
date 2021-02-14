@@ -14,7 +14,7 @@
 #########################################
 MODULE_TOP_DEF="$HOME/privatemodules" 	# Private modules reside here
 					# (c.f. 'module load use.own')
-MODULE_APP="conda-env" 			# Our generated modules go here
+MODULE_APP_DEF="conda-env" 		# Our generated modules go here
 					# (a subdir in MODULE_TOP)
 ENVIRONMENT_MODULE_TYPE="lmod"          # At present only Lmod is supported
 					# May be extended to "tcl" later.
@@ -62,7 +62,7 @@ function usage()
     $(bold Optional arguments:)
            -a|--appname APP_NAME       : name of the module corresponding
                                          to the environment.
-                                         Default is 'conda-env'.
+                                         Default is '${MODULE_APP_DEF}'.
            -m|--moduledir MODULE_DIR   : location of module file.
            -j|--jupyter                : generate a Jupyter kernel for this 
                                          environment (implies '--local-py').
@@ -90,7 +90,7 @@ function usage()
            after running any of the commands above:
 
                module use ${MODULE_TOP_DEF}
-               module load ${MODULE_APP}/my_test-py3.6.4
+               module load ${MODULE_APP_DEF}/my_test-py3.6.4
                pip install ....
                conda install ....
 
@@ -528,6 +528,7 @@ fi
 
 # Set initial values for flags
 MODULE_TOP="${MODULE_TOP_DEF}"
+MODULE_APP="${MODULE_APP_DEF}"
 CONDA_ARGS=()
 CONDA_XTRA=() 		# CONDA_ARGS are used for -p/-n/-y, XTRA is for packages
 Opt_YES=0
