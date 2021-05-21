@@ -292,6 +292,7 @@ function create_module()
 		pushenv("CONDA_DEFAULT_ENV",modroot)
 		prepend_path("LD_LIBRARY_PATH",modroot.."/lib")
 		prepend_path("PYTHONPATH",modroot.."/lib/python${PY_S}/site-packages")
+		pushenv("PYTHONNOUSERSITE",1)
 	EOF
 	echo >> "${MODULE_FILE}"
 
@@ -517,6 +518,7 @@ fi
 # Check user's env and set essential variables
 #
 check_user_env
+export PYTHONNOUSERSITE=1 	# Ignore the creator's ~/.local/lib/pythonX.Y
 
 PY=$(python -V 2>&1 | grep -o "^Python .*" | grep -o "[0-9]\(\.[0-9]\+\)\+")
 PY_S=$(python -V 2>&1 | grep -o "^Python .*" | grep -o "[0-9]\.[0-9]\+")
