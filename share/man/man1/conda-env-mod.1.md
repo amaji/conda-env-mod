@@ -3,7 +3,7 @@
 NAME
 ====
 
-**conda-env-mod** -- Create and configure a custom anaconda environment
+**conda-env-mod** -- Create and configure a custom Anaconda environment
 for installing Python packages.
 
 SYNOPSIS
@@ -16,7 +16,7 @@ DESCRIPTION
 ===========
 
 This script makes very minimal Anaconda environments and generates Lmod
-module files for using them. Users can later install and use python
+module files for using them. Users can later install and use Python
 packages in the environment after loading the modules.
 
 Key points:
@@ -114,34 +114,38 @@ Optional:
 **\--local-py**, **\--local-python**, **\--add-path**, **\--add-to-path**
 :   By default, generated modulefiles rely on Python interpreter from
     the base Anaconda (new environment's "bin" directory is *not*
-    added to $PATH). While this is intentional and desired, for some
-    rare occasions you might need to do the opposite and use Python (and
+    added to $PATH). While this is intentional and often desired, for some
+    occasions you might need to do the opposite and use Python (and other
     commands) from the new environment instead. One notable use case is
     when creating a Jupyter kernel for new environment, or occasionally
-    when some of your desired packages conflict with their counterparts
-    in the base Anaconda. This switch will tweak the generated modulefile
-    to prepend environment's "bin" directory to the $PATH. Note that if
-    you go this route, base Anaconda packages become unavailable, so you
-    would have to install *all* of your necessary packages into the
-    environment.
+    when some of your desired packages conflict with their counterparts in
+    the base Anaconda. Another use case may be when your packages generate
+    additional executables that you want to call from the command line.
+    This switch will tweak the generated modulefile to prepend environment's
+    "bin" directory to the $PATH. 
+
+    > Note that if you go this route, base Anaconda packages become
+    >  unavailable, so you would have to install *all* of your necessary
+    > packages into the environment.
 
 To summarize:
 -------------
 
-  * In default mode, resulting environment uses *base* python and all of
+  * In default mode, resulting environment uses *base* Python and all of
     the base's existing packages, while *'pip\ install'* and *'conda\ install'*
     conveniently install new packages into the environment.
 
-  * In the **\--local-python** mode, your resulting environment uses the
-    *environment's* python, and does *not* see any of the base Anaconda
+  * In the **'\--local-python'** mode, your resulting environment uses the
+    *environment's* Python, and does *not* see any of the base Anaconda
     packages. So you would have to *'pip\ install'* and *'conda\ install'*
     everything you need.
 
-  * Do not use *'pip\ install\ \--user'* (you want your packages to go
-    into the environment rather than into *$HOME/.local/lib/*).
+  * No matter what mode, **do not use** *'pip\ install\ \--user'* (you want
+    your packages to go into the environment, not into
+    *$HOME/.local/lib/pythonX.Y/site-packages*).
 
-When generating Jupyter kernels (**"kernel"** mode or **\--jupyter**),
-everything about **\--local-python** above applies. Additionally, we
+When generating Jupyter kernels (**"kernel"** mode or **'\--jupyter'**),
+everything about **'\--local-python'** above applies. Additionally, we
 highly recommend installing your packages from the command line.
 **DO NOT USE** plain *'!pip\ install'* or *'!conda\ install'* from inside
 the Jupyter notebook! See excellent explanation why here:
