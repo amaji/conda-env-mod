@@ -54,8 +54,8 @@ EXAMPLES
 | *.....*
 | *module use $HOME/privatemodules*
 | *module load conda-env/my_test-py3.6.4*
-| *pip install ....*
 | *conda install ....*
+| *pip install ....*
 
 
 SUBCOMMANDS

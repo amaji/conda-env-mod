@@ -91,8 +91,8 @@ function usage()
 
                module use ${MODULE_TOP_DEF}
                module load ${MODULE_APP_DEF}/my_test-py3.6.4
-               pip install ....
                conda install ....
+               pip install ....
 
            * Note: Do $(bold "NOT") use 'pip install --user' as it does not install 
              packages in the environment.
@@ -320,7 +320,7 @@ function create_module()
 	MSG=( "To use this environment, load the following modules:"
 	      "    $USELINE"
 	      "    module load ${MODULE_APP}/${ENV_NAME}-py${PY}"
-	      "(then standard 'pip install' / 'conda install' / run scripts)"
+	      "(then standard 'conda install' / 'pip install' / run scripts)"
 	)
 	boxify_text "${MSG[@]}"
 
@@ -380,7 +380,7 @@ function create_kernel()
 	echo
 	echo "Jupyter kernel created: \"${DISPLAY_NAME}\""
 	MSG=( "We recommend installing packages into your kernel environment"
-	      "via the command line (with 'pip install' or 'conda install')."
+	      "via the command line (with 'conda install' or 'pip install')."
 
 	)
 	boxify_text "${MSG[@]}"
