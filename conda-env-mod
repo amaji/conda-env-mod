@@ -292,7 +292,7 @@ function create_module()
 		pushenv("CONDA_DEFAULT_ENV",modroot)
 		prepend_path("LD_LIBRARY_PATH",modroot.."/lib")
 		prepend_path("PYTHONPATH",modroot.."/lib/python${PY_S}/site-packages")
-		pushenv("PYTHONNOUSERSITE",1)
+		pushenv("PYTHONNOUSERSITE","1")
 	EOF
 	echo >> "${MODULE_FILE}"
 
@@ -312,7 +312,7 @@ function create_module()
 
 	# And concoct instructions for the user.
 	# 'module use' is preferred, but fall back to 'use.own' if available
-	USELINE="module use ${CUSTOM_MODTOP//$HOME/\$HOME}"
+	USELINE="module use ${MODULE_TOP//$HOME/\$HOME}"
 	HAVE_USEOWN=$(module --redirect -q avail use.own | grep -c use.own)
 	if [[ "${MODULE_DIR}" =~ "${MODULE_TOP_DEF}/".* && "$HAVE_USEOWN" -gt 0 ]]; then
 		USELINE="module load use.own"
@@ -560,7 +560,6 @@ while true; do
 		-p|--prefix)
 			ENV_PREFIX="$2" ; shift 2 ;;
 		-m|--moduledir)
-			CUSTOM_MODTOP="$2"
 			MODULE_TOP="$2" ; shift 2 ;;
 		-y|--yes)
 			Opt_YES=1; shift ;;
