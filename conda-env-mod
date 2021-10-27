@@ -80,7 +80,7 @@ function usage()
         2) Create an environment at a custom location, such as a group-shared
            directory:
 
-               ${scriptname} create -p /my/depot/dir/my_test
+               ${scriptname} create -p /my/project/dir/my_test
 
         3) Create an environment that can be used inside Jupyter Hub:
 
@@ -204,7 +204,7 @@ function delete_env()
 	elif [[ -d "${ENV_DIR}/conda-meta" ]]; then
 		# User has answered 'no' to conda-env's prompt, bail out
 		# TODO:	This assumption is not always correct. E.g. for 
-		# 	a group-shared environment (-p /depot/....) where
+		# 	a group-shared environment (-p /my/project/....) where
 		# 	I don't have permissions to delete the env itself,
 		# 	I may still want to delete my modules for that
 		# 	environment.  The above simplistic check fails in
