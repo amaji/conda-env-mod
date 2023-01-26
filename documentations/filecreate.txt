@@ -1,0 +1,27 @@
+This version of conda-env-mod allows users to create environment from both yaml file and spec list.
+
+There is a new required argument for this feature.
+
+-f|--envfile FILE_NAME requires users to input the file path of spec list or yaml file.
+
+
+In the code, 
+    In line 61, the argument -f|--envfile FILE_NAME is added to the usage for create environment from file.
+    
+    From line 568-569, the switch case statement if the user uses the -f or --envfile flag in the command.
+        If used, a variable ENV_FILE will equals to the name of the input file. 
+    
+    From line 599-607, this is the part for previous logic to create a environment.
+    
+    From line 609-634, this is the part for getting the file name and environment name.
+        If ENV_FILE is not null, then we create environment from file.
+            1st in line 610, we add created from file argument to the CONDA_ARGS. 
+            2nd from line 611-613, we get the name of the new envrionment from command line.
+            3rd from line 614-621, if Opt_NAME is not null, we know we are working with a yaml file. The environment name is cutted from the command line.
+            4th at line 622, we add the name of the envrionment to CONDA_ARGS.
+        If ENV_FILE is null, meaning we are not creating the environment from file,
+            we get environment prefix and environment name from commmand line.
+    
+    From line 132 to 138 in function create_env(),
+        If we have Opt_YAML not equals to 0, meaning we are creating file from yaml file, we use conda env create.
+        Otherwise, we use the default conda create to create the environment.
