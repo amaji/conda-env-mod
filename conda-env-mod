@@ -58,18 +58,17 @@ function usage()
         Specify only one of the following.
            -n|--name ENV_NAME          : name of the environment.
            -p|--prefix ENV_PATH        : location of the environment.
-
+ 		   -f|--envfile FILE_NAME      : create environment from file
     $(bold Optional arguments:)
            -a|--appname APP_NAME       : name of the module corresponding
                                          to the environment.
-                                         Default is '${MODULE_APP_DEF}'.
+                                         Default is '${MODULE_APP_DEF}'.	
+           -b|--base-python            : use the Python from base Anaconda module
            -m|--moduledir MODULE_DIR   : location of module file.
            -j|--jupyter                : generate a Jupyter kernel for this 
                                          environment (implies '--local-py').
            --local-py|--local-python
-           --add-path |--add-to-path   : use the Python from the environment. 
-                                         Default is to use the Python from base
-                                         Anaconda module.
+           --add-path |--add-to-path   : use the Python from the environment. (Now the default behavior)
            -y|--yes                    : assume "yes" to all internal questions.
 
     $(bold Examples:)
@@ -129,8 +128,14 @@ function create_env()
 	#
 	# Now the actual conda create
 	#
-	echo conda create -q --copy "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
-	conda create -q --copy "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
+	# Check yaml file
+	if [[ $Opt_YAML -ne 0 ]]; then
+		echo conda env create -q "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
+		conda env create -q "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
+	else
+		echo conda create -q --copy "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
+		conda create -q --copy "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
+	fi
 	status=$?
 
 	env_list=$(conda env list)
@@ -297,15 +302,16 @@ function create_module()
 	echo >> "${MODULE_FILE}"
 
 	if [[ $Opt_LOCAL_PY -eq 0 ]]; then
+		# if user put down base-python, then use Python from base Anaconda
 		cat <<-EOF >> "${MODULE_FILE}"
 			-- This line is deliberately commented out.
 			-- We want to use Python from base Anaconda.
 			-- prepend_path("PATH",modroot.."/bin")
 		EOF
 	else
+		# python from the environment (python -V) is added to PYTHONPATH by default
 		cat <<-EOF >> "${MODULE_FILE}"
-			-- Normally we'd want to use Python from base Anaconda, but in this
-			-- special case we'll use Python from the environment itself.
+			-- Now using python from the environment is the default behavior
 			prepend_path("PATH",modroot.."/bin")
 		EOF
 	fi
@@ -534,7 +540,7 @@ MODULE_APP="${MODULE_APP_DEF}"
 CONDA_ARGS=()
 CONDA_XTRA=() 		# CONDA_ARGS are used for -p/-n/-y, XTRA is for packages
 Opt_YES=0
-Opt_LOCAL_PY=0
+Opt_LOCAL_PY=1      # local-python is now the default behavior
 Opt_JUPYTER=0
 
 # Where jupyter kernels might be.  Ask Jupyter if we can, or use defaults.
@@ -549,7 +555,7 @@ fi
 # Parse command line
 SUBCOMMAND="$1"
 shift
-TEMP=$(getopt -o a:hp:m:n:yj --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path -- "$@")
+TEMP=$(getopt -o a:hp:m:n:f:yjb --long appname:,help,prefix:,moduledir:,name:,file:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python -- "$@")
 eval set -- "$TEMP"
 while true; do
 	case "$1" in
@@ -559,12 +565,16 @@ while true; do
 			ENV_NAME="$2"; shift 2 ;;
 		-p|--prefix)
 			ENV_PREFIX="$2" ; shift 2 ;;
+		-f|--envfile)
+			ENV_FILE="$2"; shift 2 ;;		
 		-m|--moduledir)
 			MODULE_TOP="$2" ; shift 2 ;;
 		-y|--yes)
 			Opt_YES=1; shift ;;
 		-j|--jupyter)
 			Opt_JUPYTER=1; shift ;;
+		-b|--base-python)
+			Opt_LOCAL_PY=0; shift ;;
 		--local-py|--local-python|--add-path|--add-to-path)
 			Opt_LOCAL_PY=1; shift ;;
 		--) shift ; break ;;
@@ -586,14 +596,41 @@ if [ "${ENV_PREFIX}" != "" ]; then
 fi
 
 # Logic for environment name and location
-if [ "${ENV_PREFIX}" != "" ]; then
-	CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
-	if [ "${ENV_NAME}" == "" ]; then
-		ENV_NAME="${ENV_PREFIX##*/}"
+# if [ "${ENV_PREFIX}" != "" ]; then
+# 	CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
+# 	if [ "${ENV_NAME}" == "" ]; then
+# 		ENV_NAME="${ENV_PREFIX##*/}"
+# 	fi
+# fi
+# if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
+# 	CONDA_ARGS+=( --name "${ENV_NAME}" )
+# fi
+
+if [ "${ENV_FILE}" != "" ]; then
+	CONDA_ARGS+=( --file "${ENV_FILE}" )
+	read -r line<$ENV_FILE
+	#echo $line
+	Opt_NAME=$(echo "$line"|grep name)
+	if [[ "$Opt_NAME" != "" ]]; then
+		Opt_YAML=1
+		ENV_NAME=$(echo $line| cut -d' ' -f2)
+	else
+		echo "Please specify the name of the new environment."
+		echo -n "Enter Name:"
+		read ENV_NAME
 	fi
-fi
-if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
 	CONDA_ARGS+=( --name "${ENV_NAME}" )
+	#echo $NAME
+else
+	if [ "${ENV_PREFIX}" != "" ]; then
+		CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
+		if [ "${ENV_NAME}" == "" ]; then
+			ENV_NAME="${ENV_PREFIX##*/}"
+		fi
+	fi
+	if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
+		CONDA_ARGS+=( --name "${ENV_NAME}" )
+	fi	
 fi
 
 # Assemble actual modulefile directory name
@@ -671,4 +708,3 @@ case "$SUBCOMMAND" in
 		echo "Enter: '${scriptname} help' for usage instructions."
 		;;
 esac
-
