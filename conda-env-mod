@@ -63,7 +63,7 @@ function usage()
            -a|--appname APP_NAME       : name of the module corresponding
                                          to the environment.
                                          Default is '${MODULE_APP_DEF}'.	
-           -b|--base-python            : use the Python from base Anaconda module
+           -b|--base-python            : use the Python from base Anaconda module (rarely needed)
            -m|--moduledir MODULE_DIR   : location of module file.
            -j|--jupyter                : generate a Jupyter kernel for this 
                                          environment (implies '--local-py').
@@ -305,7 +305,7 @@ function create_module()
 	else
 		# python from the environment (python -V) is added to PYTHONPATH by default
 		cat <<-EOF >> "${MODULE_FILE}"
-			-- Now using python from the environment is the default behavior
+			-- Using Python and tools from the environment
 			prepend_path("PATH",modroot.."/bin")
 		EOF
 	fi
