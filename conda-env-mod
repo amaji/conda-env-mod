@@ -62,14 +62,13 @@ function usage()
     $(bold Optional arguments:)
            -a|--appname APP_NAME       : name of the module corresponding
                                          to the environment.
-                                         Default is '${MODULE_APP_DEF}'.
+                                         Default is '${MODULE_APP_DEF}'.	
+           -b|--base-python            : use the Python from base Anaconda module (rarely needed)
            -m|--moduledir MODULE_DIR   : location of module file.
            -j|--jupyter                : generate a Jupyter kernel for this 
                                          environment (implies '--local-py').
            --local-py|--local-python
-           --add-path |--add-to-path   : use the Python from the environment. 
-                                         Default is to use the Python from base
-                                         Anaconda module.
+           --add-path |--add-to-path   : use the Python from the environment. (Now the default behavior)
            -y|--yes                    : assume "yes" to all internal questions.
 
     $(bold Examples:)
@@ -297,15 +296,16 @@ function create_module()
 	echo >> "${MODULE_FILE}"
 
 	if [[ $Opt_LOCAL_PY -eq 0 ]]; then
+		# if user put down base-python, then use Python from base Anaconda
 		cat <<-EOF >> "${MODULE_FILE}"
 			-- This line is deliberately commented out.
 			-- We want to use Python from base Anaconda.
 			-- prepend_path("PATH",modroot.."/bin")
 		EOF
 	else
+		# python from the environment (python -V) is added to PYTHONPATH by default
 		cat <<-EOF >> "${MODULE_FILE}"
-			-- Normally we'd want to use Python from base Anaconda, but in this
-			-- special case we'll use Python from the environment itself.
+			-- Using Python and tools from the environment
 			prepend_path("PATH",modroot.."/bin")
 		EOF
 	fi
@@ -534,7 +534,8 @@ MODULE_APP="${MODULE_APP_DEF}"
 CONDA_ARGS=()
 CONDA_XTRA=() 		# CONDA_ARGS are used for -p/-n/-y, XTRA is for packages
 Opt_YES=0
-Opt_LOCAL_PY=0
+#Opt_LOCAL_PY=0
+Opt_LOCAL_PY=1      # local-python is now the default behavior
 Opt_JUPYTER=0
 
 # Where jupyter kernels might be.  Ask Jupyter if we can, or use defaults.
@@ -549,7 +550,7 @@ fi
 # Parse command line
 SUBCOMMAND="$1"
 shift
-TEMP=$(getopt -o a:hp:m:n:yj --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path -- "$@")
+TEMP=$(getopt -o a:hp:m:n:yjb --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python -- "$@")
 eval set -- "$TEMP"
 while true; do
 	case "$1" in
@@ -565,6 +566,8 @@ while true; do
 			Opt_YES=1; shift ;;
 		-j|--jupyter)
 			Opt_JUPYTER=1; shift ;;
+		-b|--base-python)
+			Opt_LOCAL_PY=0; shift ;;
 		--local-py|--local-python|--add-path|--add-to-path)
 			Opt_LOCAL_PY=1; shift ;;
 		--) shift ; break ;;
@@ -671,4 +674,3 @@ case "$SUBCOMMAND" in
 		echo "Enter: '${scriptname} help' for usage instructions."
 		;;
 esac
-
