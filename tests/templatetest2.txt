@@ -1,0 +1,23 @@
+depends_on("anaconda/2020.02-py37")
+
+local modroot = "$ENV_DIR"
+local pyver   = "$PY"
+
+local bashStr = 'eval '..modroot..'/bin/pip "$@"'
+local cshStr  = "eval "..modroot.."/bin/pip $*"
+set_shell_function("pip",bashStr,cshStr)
+-- If this is Python3 environment, brace against 'pip3', too
+if (string.match(pyver,"^3%.")) then
+ 	set_shell_function("pip3",bashStr,cshStr)
+end
+
+pushenv("CONDA_PREFIX",modroot)
+pushenv("CONDA_DEFAULT_ENV",modroot)
+prepend_path("LD_LIBRARY_PATH",modroot.."/lib")
+prepend_path("PYTHONPATH",modroot.."/lib/python3.7/site-packages")
+pushenv("PYTHONNOUSERSITE","1")
+
+//optional input template (use this for default template)
+// no need for user input
+
+//generate module file, different base on different template
