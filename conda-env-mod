@@ -130,8 +130,19 @@ function create_env()
 	#
 	# Check yaml file
 	if [[ $Opt_YAML -ne 0 ]]; then
-		echo conda env create -q "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
-		conda env create -q "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
+		if [[ "${PY}" != "" ]]; then
+			echo "Not allow to create environment from yaml file with a different python version"
+			echo "Creating environment with python version in the yaml file"
+		fi
+		echo conda env create -q "${CONDA_ARGS[@]}" "${CONDA_XTRA[@]}"
+		conda env create -q "${CONDA_ARGS[@]}" "${CONDA_XTRA[@]}"
+	elif [[ $Opt_SPEC -ne 0 ]]; then
+		if [[ "${PY}" != "" ]]; then
+			echo "Not allow to create environment from spec list with a different python version"
+			echo "Creating environment with python version in the spec list"
+		fi
+		echo conda create -q "${CONDA_ARGS[@]}" "${CONDA_XTRA[@]}"
+		conda create -q "${CONDA_ARGS[@]}" "${CONDA_XTRA[@]}"
 	else
 		echo conda create -q --copy "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
 		conda create -q --copy "${CONDA_ARGS[@]}" python="${PY}" "${CONDA_XTRA[@]}"
@@ -268,37 +279,20 @@ function create_module()
 		-- created on $(date) by $USER
 
 	EOF
-	if [ "${CONDA_MODULE}" != "" ]; then
-		cat <<-EOF >> "${MODULE_FILE}"
-			depends_on("${CONDA_MODULE}")
+	# echo $MOD_TEMPLATE
 
-		EOF
-	elif [ -f "${CONDA_PREFIX}/bin/conda" ]; then
-		cat <<-EOF >> "${MODULE_FILE}"
-			-- Use the base conda that created this environment.
-			prepend_path("PATH","${CONDA_PREFIX}/bin")
-		EOF
-	else
-		echo -e "WARNING: Couldn't find an anaconda module.\nPlease make sure you to initialize conda separately."
-	fi
-	cat <<-EOF >> "${MODULE_FILE}"
-		local modroot = "${ENV_DIR}"
-		local pyver   = "${PY}"
+	variables=$(sed -n 's/.*\$\({\)\?\([a-zA-Z][a-zA-Z0-9_]*\)\(}\)\?.*/\2/p' "$MOD_TEMPLATE") #variable begin with character, maybe just $MOD, only search for dollar
 
-		local bashStr = 'eval '..modroot..'/bin/pip "\$@"'
-		local cshStr  = "eval "..modroot.."/bin/pip \$*"
-		set_shell_function("pip",bashStr,cshStr)
-		-- If this is Python3 environment, brace against 'pip3', too
-		if (string.match(pyver,"^3%.")) then
-		 	set_shell_function("pip3",bashStr,cshStr)
-		end
+	sed_command=""
 
-		pushenv("CONDA_PREFIX",modroot)
-		pushenv("CONDA_DEFAULT_ENV",modroot)
-		prepend_path("LD_LIBRARY_PATH",modroot.."/lib")
-		prepend_path("PYTHONPATH",modroot.."/lib/python${PY_S}/site-packages")
-		pushenv("PYTHONNOUSERSITE","1")
-	EOF
+	for variable in $variables; do
+		echo "$variable" 
+		sed_command+="s#\${$variable}#${!variable}#g;" #may not have {}
+	done
+
+	echo $sed_command
+	sed -e "$sed_command" "$MOD_TEMPLATE" > "${MODULE_FILE}"
+
 	echo >> "${MODULE_FILE}"
 
 	if [[ $Opt_LOCAL_PY -eq 0 ]]; then
@@ -555,20 +549,22 @@ fi
 # Parse command line
 SUBCOMMAND="$1"
 shift
-TEMP=$(getopt -o a:hp:m:n:f:yjb --long appname:,help,prefix:,moduledir:,name:,file:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python -- "$@")
+TEMP=$(getopt -o a:hp:m:n:f:t:yjb --long appname:,help,prefix:,moduledir:,name:,file:,template:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python -- "$@")
 eval set -- "$TEMP"
 while true; do
 	case "$1" in
 		-a|--appname)
-			MODULE_APP="$2"; shift 2 ;;
+			MODULE_APP="$2" ; shift 2 ;;
 		-n|--name)
-			ENV_NAME="$2"; shift 2 ;;
+			ENV_NAME="$2" ; shift 2 ;;
 		-p|--prefix)
 			ENV_PREFIX="$2" ; shift 2 ;;
 		-f|--envfile)
-			ENV_FILE="$2"; shift 2 ;;		
+			ENV_FILE="$2" ; shift 2 ;;		
 		-m|--moduledir)
 			MODULE_TOP="$2" ; shift 2 ;;
+		-t|--template)
+			MOD_TEMPLATE="$2" ; shift 2 ;;
 		-y|--yes)
 			Opt_YES=1; shift ;;
 		-j|--jupyter)
@@ -596,41 +592,14 @@ if [ "${ENV_PREFIX}" != "" ]; then
 fi
 
 # Logic for environment name and location
-# if [ "${ENV_PREFIX}" != "" ]; then
-# 	CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
-# 	if [ "${ENV_NAME}" == "" ]; then
-# 		ENV_NAME="${ENV_PREFIX##*/}"
-# 	fi
-# fi
-# if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
-# 	CONDA_ARGS+=( --name "${ENV_NAME}" )
-# fi
-
-if [ "${ENV_FILE}" != "" ]; then
-	CONDA_ARGS+=( --file "${ENV_FILE}" )
-	read -r line<$ENV_FILE
-	#echo $line
-	Opt_NAME=$(echo "$line"|grep name)
-	if [[ "$Opt_NAME" != "" ]]; then
-		Opt_YAML=1
-		ENV_NAME=$(echo $line| cut -d' ' -f2)
-	else
-		echo "Please specify the name of the new environment."
-		echo -n "Enter Name:"
-		read ENV_NAME
+if [ "${ENV_PREFIX}" != "" ]; then
+	CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
+	if [ "${ENV_NAME}" == "" ]; then
+		ENV_NAME="${ENV_PREFIX##*/}"
 	fi
+fi
+if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
 	CONDA_ARGS+=( --name "${ENV_NAME}" )
-	#echo $NAME
-else
-	if [ "${ENV_PREFIX}" != "" ]; then
-		CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
-		if [ "${ENV_NAME}" == "" ]; then
-			ENV_NAME="${ENV_PREFIX##*/}"
-		fi
-	fi
-	if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
-		CONDA_ARGS+=( --name "${ENV_NAME}" )
-	fi	
 fi
 
 # Assemble actual modulefile directory name
