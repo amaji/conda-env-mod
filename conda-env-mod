@@ -71,6 +71,7 @@ function usage()
                                          Default is '${MODULE_APP_DEF}'.	
            -b|--base-python            : use the Python from base Anaconda module (rarely needed)
            -m|--moduledir MODULE_DIR   : location of module file.
+           -t|--module-template MODULE_TEMPLATE : use a custom module template to generate the module file.
            -j|--jupyter                : generate a Jupyter kernel for this 
                                          environment (implies '--local-py').
            --local-py|--local-python
@@ -513,7 +514,7 @@ fi
 # Parse command line
 SUBCOMMAND="$1"
 shift
-TEMP=$(getopt -o a:hp:m:n:yjb --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python -- "$@")
+TEMP=$(getopt -o a:hp:m:n:yjbt: --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python,module-template: -- "$@")
 eval set -- "$TEMP"
 while true; do
 	case "$1" in
@@ -522,15 +523,17 @@ while true; do
 		-n|--name)
 			ENV_NAME="$2"; shift 2 ;;
 		-p|--prefix)
-			ENV_PREFIX="$2" ; shift 2 ;;
+			ENV_PREFIX="$2"; shift 2 ;;
 		-m|--moduledir)
-			MODULE_TOP="$2" ; shift 2 ;;
+			MODULE_TOP="$2"; shift 2 ;;
 		-y|--yes)
 			Opt_YES=1; shift ;;
 		-j|--jupyter)
 			Opt_JUPYTER=1; shift ;;
 		-b|--base-python)
 			Opt_LOCAL_PY=0; shift ;;
+		-t|--module-template)
+			MODULE_TEMPLATE="$2"; shift 2 ;;
 		--local-py|--local-python|--add-path|--add-to-path)
 			Opt_LOCAL_PY=1; shift ;;
 		--) shift ; break ;;
