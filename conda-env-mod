@@ -17,7 +17,7 @@ MODULE_TOP_DEF="$HOME/privatemodules" 	# Private modules reside here
 MODULE_APP_DEF="conda-env" 		# Our generated modules go here
 					# (a subdir in MODULE_TOP)
 ENVIRONMENT_MODULE_TYPE="lmod"          # At present only Lmod is supported
-					# May be extended to "tcl" later.
+					# TCL support is rudimentary.
 MODULE_INIT_SCRIPT="/etc/profile.d/modules.sh"
 					# Script to initialize Lmod commands.
 BASE_CONDA_MODULE_NAME="anaconda"	# This is what you call the base
@@ -223,7 +223,11 @@ function delete_env()
 	fi
 
 	# Delete the modulefile
-	MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	if [ "${ENVIRONMENT_MODULE_TYPE}" == "lmod" ]; then
+		MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	elif [ "${ENVIRONMENT_MODULE_TYPE}" == "tcl" ]; then
+                MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}"
+	fi
 	echo "Deleting module file: ${MODULE_FILE//$HOME/\$HOME}"
 	rm -f "${MODULE_FILE}"
 
@@ -268,7 +272,11 @@ function create_module()
 		exit 1
 	fi
 
-	MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	if [ "${ENVIRONMENT_MODULE_TYPE}" == "lmod" ]; then
+		MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	elif [ "${ENVIRONMENT_MODULE_TYPE}" == "tcl" ]; then
+                MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}"
+	fi
 	CONDA_MODULE=$(module --redirect --terse list ${BASE_CONDA_MODULE_NAME} | grep "^${BASE_CONDA_MODULE_NAME}\/.*")
 
 	source ${MODULE_TEMPLATE} > ${MODULE_FILE}
