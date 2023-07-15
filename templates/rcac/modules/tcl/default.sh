@@ -35,20 +35,13 @@ cat <<-EOF
 	set modroot "${ENV_DIR}"
 	set pyver "${PY}"
 
-	set-alias pip "\$modroot/bin/pip"
-	# If this is Python3 environment, brace against 'pip3', too
-	if {[regexp "^3\." "$pyver" match]} {
-	    set-alias pip3 "\$modroot/bin/pip"
-	}
-
 	pushenv CONDA_PREFIX "\$modroot"
 	pushenv CONDA_DEFAULT_ENV "\$modroot"
 	prepend-path LD_LIBRARY_PATH "\$modroot/lib"
 	prepend-path PYTHONPATH "\$modroot/lib/python${PY_S}/site-packages"
 	pushenv PYTHONNOUSERSITE "1"
-EOF
 
-echo ""
+EOF
 
 if [[ $Opt_LOCAL_PY -eq 0 ]]; then
 	# if user put down base-python, then use Python from base Anaconda
@@ -56,6 +49,13 @@ if [[ $Opt_LOCAL_PY -eq 0 ]]; then
 		# This line is deliberately commented out.
 		# We want to use Python from base Anaconda.
 		# prepend-path PATH "\$modroot/bin"
+
+		set-alias pip "\$modroot/bin/pip"
+		# If this is Python3 environment, brace against 'pip3', too
+		if {[regexp "^3\." "$pyver" match]} {
+		    set-alias pip3 "\$modroot/bin/pip"
+		}
+
 	EOF
 else
 	# python from the environment (python -V) is added to PYTHONPATH by default

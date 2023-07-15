@@ -34,22 +34,13 @@ cat <<-EOF
 	local modroot = "${ENV_DIR}"
 	local pyver   = "${PY}"
 
-	local bashStr = 'eval '..modroot..'/bin/pip "\$@"'
-	local cshStr  = "eval "..modroot.."/bin/pip \$*"
-	set_shell_function("pip",bashStr,cshStr)
-	-- If this is Python3 environment, brace against 'pip3', too
-	if (string.match(pyver,"^3%.")) then
-	    set_shell_function("pip3",bashStr,cshStr)
-	end
-
 	pushenv("CONDA_PREFIX",modroot)
 	pushenv("CONDA_DEFAULT_ENV",modroot)
 	prepend_path("LD_LIBRARY_PATH",modroot.."/lib")
 	prepend_path("PYTHONPATH",modroot.."/lib/python${PY_S}/site-packages")
 	pushenv("PYTHONNOUSERSITE","1")
-EOF
 
-echo ""
+EOF
 
 if [[ $Opt_LOCAL_PY -eq 0 ]]; then
 	# if user put down base-python, then use Python from base Anaconda
@@ -57,11 +48,21 @@ if [[ $Opt_LOCAL_PY -eq 0 ]]; then
 		-- This line is deliberately commented out.
 		-- We want to use Python from base Anaconda.
 		-- prepend_path("PATH",modroot.."/bin")
+
+		local bashStr = 'eval '..modroot..'/bin/pip "\$@"'
+		local cshStr  = "eval "..modroot.."/bin/pip \$*"
+		set_shell_function("pip",bashStr,cshStr)
+		-- If this is Python3 environment, brace against 'pip3', too
+		if (string.match(pyver,"^3%.")) then
+		    set_shell_function("pip3",bashStr,cshStr)
+		end
+
 	EOF
 else
 	# python from the environment (python -V) is added to PYTHONPATH by default
 	cat <<-EOF
 		-- Using Python and tools from the environment
 		prepend_path("PATH",modroot.."/bin")
+
 	EOF
 fi
