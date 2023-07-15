@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Amiya K Maji and Lev Gorenstein
-# Copyright: Purdue University, 2019.
+# Copyright: Purdue University, 2023.
 #
 # This script assumes that you have Lmod and Anaconda installed on your system.
 # You should not set $PYTHONPATH to base Anaconda installation.
@@ -17,11 +17,17 @@ MODULE_TOP_DEF="$HOME/privatemodules" 	# Private modules reside here
 MODULE_APP_DEF="conda-env" 		# Our generated modules go here
 					# (a subdir in MODULE_TOP)
 ENVIRONMENT_MODULE_TYPE="lmod"          # At present only Lmod is supported
-					# May be extended to "tcl" later.
+					# TCL support is rudimentary.
 MODULE_INIT_SCRIPT="/etc/profile.d/modules.sh"
 					# Script to initialize Lmod commands.
 BASE_CONDA_MODULE_NAME="anaconda"	# This is what you call the base
 					# anaconda module.
+DEFAULT_TEMPLATE_DIR="templates/rcac"   #
+                                        #
+SCRIPT_TOP_DIR="$(realpath ${BASH_SOURCE[0]} | xargs dirname)"
+                                        #
+DEFAULT_MODULE_TEMPLATE="${SCRIPT_TOP_DIR}/${DEFAULT_TEMPLATE_DIR}/modules/${ENVIRONMENT_MODULE_TYPE}/default.sh"
+                                        #
 # end configurations                    #
 #########################################
 
@@ -65,6 +71,7 @@ function usage()
                                          Default is '${MODULE_APP_DEF}'.	
            -b|--base-python            : use the Python from base Anaconda module (rarely needed)
            -m|--moduledir MODULE_DIR   : location of module file.
+           -t|--module-template MODULE_TEMPLATE : use a custom module template to generate the module file.
            -j|--jupyter                : generate a Jupyter kernel for this 
                                          environment (implies '--local-py').
            --local-py|--local-python
@@ -216,7 +223,11 @@ function delete_env()
 	fi
 
 	# Delete the modulefile
-	MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	if [ "${ENVIRONMENT_MODULE_TYPE}" == "lmod" ]; then
+		MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	elif [ "${ENVIRONMENT_MODULE_TYPE}" == "tcl" ]; then
+                MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}"
+	fi
 	echo "Deleting module file: ${MODULE_FILE//$HOME/\$HOME}"
 	rm -f "${MODULE_FILE}"
 
@@ -255,60 +266,20 @@ function create_module()
 		mkdir -p "${MODULE_DIR}"
 	fi
 
-	MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	if [ ! -f "${MODULE_TEMPLATE}" ]; then
+		echo "Cannot locate module template: ${MODULE_TEMPLATE}"
+		echo "Aborting module file generation."
+		exit 1
+	fi
+
+	if [ "${ENVIRONMENT_MODULE_TYPE}" == "lmod" ]; then
+		MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}.lua"
+	elif [ "${ENVIRONMENT_MODULE_TYPE}" == "tcl" ]; then
+                MODULE_FILE="${MODULE_DIR}/${ENV_NAME}-py${PY}"
+	fi
 	CONDA_MODULE=$(module --redirect --terse list ${BASE_CONDA_MODULE_NAME} | grep "^${BASE_CONDA_MODULE_NAME}\/.*")
 
-	cat <<-EOF > "${MODULE_FILE}"
-		-- created on $(date) by $USER
-
-	EOF
-	if [ "${CONDA_MODULE}" != "" ]; then
-		cat <<-EOF >> "${MODULE_FILE}"
-			depends_on("${CONDA_MODULE}")
-
-		EOF
-	elif [ -f "${CONDA_PREFIX}/bin/conda" ]; then
-		cat <<-EOF >> "${MODULE_FILE}"
-			-- Use the base conda that created this environment.
-			prepend_path("PATH","${CONDA_PREFIX}/bin")
-		EOF
-	else
-		echo -e "WARNING: Couldn't find an anaconda module.\nPlease make sure you to initialize conda separately."
-	fi
-	cat <<-EOF >> "${MODULE_FILE}"
-		local modroot = "${ENV_DIR}"
-		local pyver   = "${PY}"
-
-		local bashStr = 'eval '..modroot..'/bin/pip "\$@"'
-		local cshStr  = "eval "..modroot.."/bin/pip \$*"
-		set_shell_function("pip",bashStr,cshStr)
-		-- If this is Python3 environment, brace against 'pip3', too
-		if (string.match(pyver,"^3%.")) then
-		 	set_shell_function("pip3",bashStr,cshStr)
-		end
-
-		pushenv("CONDA_PREFIX",modroot)
-		pushenv("CONDA_DEFAULT_ENV",modroot)
-		prepend_path("LD_LIBRARY_PATH",modroot.."/lib")
-		prepend_path("PYTHONPATH",modroot.."/lib/python${PY_S}/site-packages")
-		pushenv("PYTHONNOUSERSITE","1")
-	EOF
-	echo >> "${MODULE_FILE}"
-
-	if [[ $Opt_LOCAL_PY -eq 0 ]]; then
-		# if user put down base-python, then use Python from base Anaconda
-		cat <<-EOF >> "${MODULE_FILE}"
-			-- This line is deliberately commented out.
-			-- We want to use Python from base Anaconda.
-			-- prepend_path("PATH",modroot.."/bin")
-		EOF
-	else
-		# python from the environment (python -V) is added to PYTHONPATH by default
-		cat <<-EOF >> "${MODULE_FILE}"
-			-- Using Python and tools from the environment
-			prepend_path("PATH",modroot.."/bin")
-		EOF
-	fi
+	source ${MODULE_TEMPLATE} > ${MODULE_FILE}
 
 	# And concoct instructions for the user.
 	# 'module use' is preferred, but fall back to 'use.own' if available
@@ -531,6 +502,7 @@ fi
 # Set initial values for flags
 MODULE_TOP="${MODULE_TOP_DEF}"
 MODULE_APP="${MODULE_APP_DEF}"
+MODULE_TEMPLATE="${DEFAULT_MODULE_TEMPLATE}"
 CONDA_ARGS=()
 CONDA_XTRA=() 		# CONDA_ARGS are used for -p/-n/-y, XTRA is for packages
 Opt_YES=0
@@ -550,7 +522,7 @@ fi
 # Parse command line
 SUBCOMMAND="$1"
 shift
-TEMP=$(getopt -o a:hp:m:n:yjb --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python -- "$@")
+TEMP=$(getopt -o a:hp:m:n:yjbt: --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python,module-template: -- "$@")
 eval set -- "$TEMP"
 while true; do
 	case "$1" in
@@ -559,15 +531,17 @@ while true; do
 		-n|--name)
 			ENV_NAME="$2"; shift 2 ;;
 		-p|--prefix)
-			ENV_PREFIX="$2" ; shift 2 ;;
+			ENV_PREFIX="$2"; shift 2 ;;
 		-m|--moduledir)
-			MODULE_TOP="$2" ; shift 2 ;;
+			MODULE_TOP="$2"; shift 2 ;;
 		-y|--yes)
 			Opt_YES=1; shift ;;
 		-j|--jupyter)
 			Opt_JUPYTER=1; shift ;;
 		-b|--base-python)
 			Opt_LOCAL_PY=0; shift ;;
+		-t|--module-template)
+			MODULE_TEMPLATE="$2"; shift 2 ;;
 		--local-py|--local-python|--add-path|--add-to-path)
 			Opt_LOCAL_PY=1; shift ;;
 		--) shift ; break ;;
