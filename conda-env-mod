@@ -72,7 +72,7 @@ function usage()
            -b|--base-python            : use the Python from base Anaconda module (rarely needed)
            -m|--moduledir MODULE_DIR   : location of module file.
            -t|--module-template MODULE_TEMPLATE : use a custom module template to generate the module file.
-           -e|--export-file            : specify a file name to save the exported environment.
+           -f|--file                   : specify a file name to create or export an environment. Only YAML files are supported.
            -j|--jupyter                : generate a Jupyter kernel for this 
                                          environment (implies '--local-py').
            --local-py|--local-python
@@ -566,7 +566,7 @@ fi
 # Parse command line
 SUBCOMMAND="$1"
 shift
-TEMP=$(getopt -o a:hp:m:n:yjbt:e: --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python,module-template:export-file: -- "$@")
+TEMP=$(getopt -o a:hp:m:n:yjbt:f: --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python,module-template:file: -- "$@")
 eval set -- "$TEMP"
 while true; do
 	case "$1" in
@@ -586,8 +586,16 @@ while true; do
 			Opt_LOCAL_PY=0; shift ;;
 		-t|--module-template)
 			MODULE_TEMPLATE="$2"; shift 2 ;;
-		-e|--export-file)
-			ENV_EXPORT_FILE="$2"; shift 2 ;;
+		-f|--file)
+			if [ "${SUBCOMMAND}" == "create" ]; then
+				ENV_SPEC_FILE="$2"
+			elif [ "${SUBCOMMAND}" == "export" ]; then
+				ENV_EXPORT_FILE="$2"
+			else
+				echo "The '-f|--file' option can only be specified when creating or exporting an environment."
+				echo "Ignoring this option."
+			fi
+			shift 2 ;;
 		--local-py|--local-python|--add-path|--add-to-path)
 			Opt_LOCAL_PY=1; shift ;;
 		--) shift ; break ;;
@@ -620,12 +628,6 @@ if [ "${ENV_PREFIX}" != "" ]; then
 fi
 if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
 	CONDA_ARGS+=( --name "${ENV_NAME}" )
-fi
-
-# Logic for environment export file
-if [[ "${ENV_EXPORT_FILE}" != "" ]] && [[ "${SUBCOMMAND}" != "export" ]]; then
-	echo "The '-e|--export-file' option can only be specified when exporting an environment."
-	echo "Ignoring this option."
 fi
 
 # Assemble actual modulefile directory name
