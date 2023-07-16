@@ -611,7 +611,10 @@ fi
 # Logic for environment name and location
 if [ "${ENV_PREFIX}" != "" ]; then
 	CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
-	if [ "${ENV_NAME}" == "" ]; then
+	if [ "${ENV_NAME}" != "" ]; then
+		echo "Cannot specify both environment name and prefix. Please specify one or the other."
+		exit 1
+	else
 		ENV_NAME="${ENV_PREFIX##*/}"
 	fi
 fi
