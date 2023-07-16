@@ -58,7 +58,7 @@ function usage()
     $(bold Usage:) ${scriptname} <subcommand> <required argument> [optional argument(s)]
            ${scriptname} help
 
-    $(bold Subcommands:) create, delete, module, kernel
+    $(bold Subcommands:) create, delete, export, module, kernel
 
     $(bold Required arguments:) 
         Specify only one of the following.
@@ -72,6 +72,7 @@ function usage()
            -b|--base-python            : use the Python from base Anaconda module (rarely needed)
            -m|--moduledir MODULE_DIR   : location of module file.
            -t|--module-template MODULE_TEMPLATE : use a custom module template to generate the module file.
+           -e|--export-file            : specify a file name to save the exported environment.
            -j|--jupyter                : generate a Jupyter kernel for this 
                                          environment (implies '--local-py').
            --local-py|--local-python
@@ -239,6 +240,47 @@ function delete_env()
 
 }
 # end delete_env
+
+function export_env()
+{
+	#
+	# Usage: export_env
+	#
+	if [ "${ENV_PREFIX}" != "" ]; then
+		ENV_DIR="${ENV_PREFIX}"
+	else
+		env_list=$(conda env list)
+		ENV_DIR=$(echo "${env_list}" | grep "${ENV_NAME} .*/${ENV_NAME}" | awk '{print $NF}')
+	fi
+	if [[ "${ENV_DIR}" == "" ]]; then
+		if [ "${ENV_NAME}" != "" ]; then
+			echo "Could not locate environment: ${ENV_NAME}. Is \${CONDA_ENVS_PATH} set correctly?"
+			exit 1
+		else
+			echo -e "Neither environment name nor environment prefix is specified.\nExporting current environment."
+		fi
+	elif [[ ! -d "${ENV_DIR}/conda-meta" ]]; then
+		echo -e "I could not find an environment at: ${ENV_DIR}.\nAborting export command."
+		exit 1
+	fi
+
+	# Now the actual export
+	#
+	echo "Exporting environment at location: ${ENV_DIR}"
+	echo conda-env export "${CONDA_ARGS[@]}"
+	conda-env export "${CONDA_ARGS[@]}"
+	status=$?
+
+	if [ $status -ne 0 ]; then
+		echo "Failed to export environment: ${ENV_DIR}"
+		exit 1
+	else
+		echo "Successfully exported environment at ${ENV_DIR} to file ${ENV_EXPORT_FILE}."
+	fi
+}
+# end export_env
+
+
 
 
 function create_module()
@@ -522,7 +564,7 @@ fi
 # Parse command line
 SUBCOMMAND="$1"
 shift
-TEMP=$(getopt -o a:hp:m:n:yjbt: --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python,module-template: -- "$@")
+TEMP=$(getopt -o a:hp:m:n:yjbt:e: --long appname:,help,prefix:,moduledir:,name:,yes,jupyter,local-py,local-python,add-path,add-to-path,base-python,module-template:export-file: -- "$@")
 eval set -- "$TEMP"
 while true; do
 	case "$1" in
@@ -542,6 +584,8 @@ while true; do
 			Opt_LOCAL_PY=0; shift ;;
 		-t|--module-template)
 			MODULE_TEMPLATE="$2"; shift 2 ;;
+		-e|--export-file)
+			ENV_EXPORT_FILE="$2"; shift 2 ;;
 		--local-py|--local-python|--add-path|--add-to-path)
 			Opt_LOCAL_PY=1; shift ;;
 		--) shift ; break ;;
@@ -571,6 +615,12 @@ if [ "${ENV_PREFIX}" != "" ]; then
 fi
 if [[ "${ENV_NAME}" != "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
 	CONDA_ARGS+=( --name "${ENV_NAME}" )
+fi
+
+# Logic for environment export file
+if [[ "${ENV_EXPORT_FILE}" != "" ]] && [[ "${SUBCOMMAND}" != "export" ]]; then
+	echo "The '-e|--export-file' option can only be specified when exporting an environment."
+	echo "Ignoring this option."
 fi
 
 # Assemble actual modulefile directory name
@@ -614,6 +664,29 @@ case "$SUBCOMMAND" in
 			exit
 		fi
 		delete_env
+		;;
+	export)
+		echo "requested $SUBCOMMAND with arguments: $TEMP"
+		if [[ "${ENV_NAME}" == "" ]] && [[ "${ENV_PREFIX}" == "" ]]; then
+			# Try to determine currently activated environment from context
+			ENV_PREFIX="$(conda info --envs | grep '*' | awk '{print $3}')"
+			if [ "${ENV_PREFIX}" != "" ]; then
+				CONDA_ARGS+=( --prefix "${ENV_PREFIX}" )
+			fi
+		fi
+		if [ "${ENV_EXPORT_FILE}" == "" ]; then
+			# determine name for the saved environment
+			if [ "${ENV_NAME}" != "" ]; then
+				ENV_EXPORT_FILE="${ENV_NAME}.yml"
+			elif [ "${ENV_PREFIX}" != "" ]; then
+				ENV_EXPORT_FILE="${ENV_PREFIX##*/}.yml"
+			else
+				ENV_EXPORT_FILE="environment.yml"
+			fi
+		fi
+
+		CONDA_ARGS+=( --file "${ENV_EXPORT_FILE}" )
+		export_env
 		;;
 	module)
 		echo "requested $SUBCOMMAND with arguments: $TEMP"
