@@ -494,9 +494,11 @@ function check_conda_variables()
 	fi
 
 	if [ "${CONDA_PREFIX}" == "" ]; then
-		# Set CONDA_PREFIX to base anaconda installation
-		bindir=$(dirname $(command -v conda))
-		base_conda_dir=$(realpath $bindir/..)
+		# Set CONDA_PREFIX to currently activated environment or to the base anaconda installation
+		base_conda_dir=$(conda info --envs | grep '*' | awk '{print $3}')
+		if [ "${base_conda_dir}" == "" ]; then
+			base_conda_dir=$(conda info --base)
+		fi
 		if [ "${base_conda_dir}" != "" ]; then
 			echo export CONDA_PREFIX="${base_conda_dir}"
 			export CONDA_PREFIX="${base_conda_dir}"
