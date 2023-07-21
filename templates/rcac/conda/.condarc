@@ -6,4 +6,4 @@ channels:
 ssl_verify: true
 
 envs_dirs:
-  - $RCAC_SCRATCH/envs
+  - ${PROJECT}/envs
