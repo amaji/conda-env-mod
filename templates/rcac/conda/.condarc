@@ -1,0 +1,9 @@
+channel-priority: 'strict'
+channels:
+  - conda-forge
+  - defaults
+
+ssl_verify: true
+
+envs_dirs:
+  - $RCAC_SCRATCH/envs
